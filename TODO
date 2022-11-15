@@ -1,0 +1,9 @@
+General:
+* import modules from extlibs
+* determine output information format + data
+* for a single game name, list roms with romfile name, hashes (crc32, md5, sha1), headers information (when they exist, with pyrominfo)
+
+PRF:
+* Command line: 
+  * set system, files path
+  * parallel jobs
