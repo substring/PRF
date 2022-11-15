@@ -1,5 +1,8 @@
 import argparse
 import os
+
+from extlibs.pyrominfo.pyrominfo import RomInfo
+from extlibs.pyrominfo.pyrominfo import dreamcast, gameboy, gba, genericdisc, genesis, mastersystem, nes, nintendo64, nintendods, saturn, snes
 from src.loadmodule import loadModule
 
 """
@@ -11,13 +14,7 @@ parser.add_argument("--system", "-s", help="System name of the roms folder",
 parser.add_argument("--jobs", "-j", help="Sets the number of parallel jobs to run", type=int, default=1)
 args = parser.parse_args()
 
-def getRomParser(system):
-    if system == 'nes':
-        return loadModule('nes', 'pyrominfo').NESParser()
 
 if __name__ == '__main__':
-  #rominfo_module = loadModule('nes', 'pyrominfo')
-  #romparser = rominfo_module.NESParser()
-  romparser = getRomParser(args.system)
-  print(romparser.getValidExtensions())
-  
+  print(RomInfo.parse('extlibs/pyrominfo/tests/data/Akumajou Dracula.fds'))
+  print(RomInfo.parse('extlibs/pyrominfo/tests/data/Sonic the Hedgehog.bin'))
