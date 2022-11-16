@@ -20,6 +20,7 @@ class Rom:
 		self.filecrc = filecrc
 		self.archiveContent = []
 		self.isoExtensions = ['iso', 'cue', 'chd']
+		self.known_archive_extentions = ['zip', '7z']
 		self.getCRC()
 		self.getMD5()
 		self.getSHA1()
@@ -45,6 +46,9 @@ class Rom:
 		buf = (binascii.crc32(buf) & 0xFFFFFFFF)
 		self.filecrc = "%08X" % buf
 		return self.filecrc
+
+	def isArchive(self) -> bool:
+		return self.romext in self.known_archive_extentions
 
 	def listArchiveFromZip(self) -> list:
 		filesList = []
@@ -80,6 +84,8 @@ class Rom:
 			return outputFile
 
 	def extractFileFrom7z(self, archiveFile: str, destinationPath = '/tmp') -> str:
+		if destinationPath == 'ram':
+			return py7zr.SevenZipFile(self.rompathname).read([archiveFile])[archiveFile].getvalue()
 		with py7zr.SevenZipFile(self.rompathname, 'r') as romzip:
 			romzip.extract(destinationPath, archiveFile)
 			return "{}/{}".format(destinationPath, archiveFile)
@@ -94,11 +100,17 @@ class Rom:
 			extractedFileLocation = self.extractFileFrom7z(fileName, path)
 		return extractedFileLocation
 
-	def md5sum(self, filename):
-		return hashlib.md5(open(filename,'rb').read()).hexdigest()
+	def md5sum(self, filename='', data=''):
+		if filename:
+			return hashlib.md5(open(filename,'rb').read()).hexdigest()
+		if data:
+			return hashlib.md5(data).hexdigest()
 
-	def sha1sum(self, filename):
-		return hashlib.sha1(open(filename,'rb').read()).hexdigest()
+	def sha1sum(self, filename='', data=''):
+		if filename:
+			return hashlib.sha1(open(filename,'rb').read()).hexdigest()
+		if data:
+			return hashlib.sha1(data).hexdigest()
 
 	def getMD5orSHA1(self, hashType) -> str | None:
 		rom = ''
@@ -106,15 +118,15 @@ class Rom:
 			return None
 		if len(self.archiveContent) != 1:
 			if hashType == 'md5':
-				return self.md5sum(self.rompathname)
+				return self.md5sum(filename=self.rompathname)
 			elif hashType == 'sha1':
-				return self.sha1sum(self.rompathname)
-		rom = self.extractRom()
+				return self.sha1sum(filename=self.rompathname)
+			os.remove(rom)
+		rom = self.extractRom('ram', list(self.archiveContent[0].keys())[0])
 		if hashType == 'md5':
-			romHash = self.md5sum(rom)
+			romHash = self.md5sum(data=rom)
 		elif hashType == 'sha1':
-			romHash = self.sha1sum(rom)
-		os.remove(rom)
+			romHash = self.sha1sum(data=rom)
 		return romHash
 
 	def getMD5(self):

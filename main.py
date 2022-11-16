@@ -23,38 +23,49 @@ def parse_rom(rom_file: str):
     # Archive: make sure there is only one rom inside and buffer it
     # Compute its hashes
     my_rom = Rom(rom_file)
-    if my_rom.archiveContent and len(my_rom.archiveContent) == 1:
+    print(my_rom)
+    real_rom = ''
+    #if my_rom.archiveContent and len(my_rom.archiveContent) == 1:
+    if my_rom.isArchive() and len(my_rom.archiveContent) > 1:
+        ret = {}
+    elif my_rom.isArchive():
         real_rom = list(my_rom.archiveContent[0].keys())[0]
         rom_data = my_rom.extractRom('ram', real_rom)
-        return RomInfo.parseBuffer(rom_data)
-    # print(my_rom)
-    return RomInfo.parse(rom_file)
+        ret = RomInfo.parseBuffer(rom_data)
+    else:
+        ret = RomInfo.parse(rom_file)
+    ret['source'] = rom_file
+    ret['rom'] = real_rom if real_rom else os.path.basename(rom_file)
+    return ret
 
 
 if __name__ == '__main__':
-    print(RomInfo.parse('extlibs/pyrominfo/tests/data/Akumajou Dracula.fds'))
-    print(RomInfo.parse('extlibs/pyrominfo/tests/data/Sonic the Hedgehog.bin'))
+    #print(RomInfo.parse('extlibs/pyrominfo/tests/data/Akumajou Dracula.fds'))
+    #print(RomInfo.parse('extlibs/pyrominfo/tests/data/Sonic the Hedgehog.bin'))
 
     if not os.path.exists(args.path):
         raise ValueError("Path %s doesn't exist", args.path)
 
     # find files
     files_list = []
+    print("Looking for files...")
     for path, subdirs, files in os.walk(args.path):
         for name in files:
             files_list.append(os.path.join(path, name))
+    print("Sorting file list...")
+    files = sorted(files)
     # print(files_list)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers = args.jobs) as executor:
         parsed_files = {executor.submit(parse_rom, file): file for file in files_list}
         for rom in concurrent.futures.as_completed(parsed_files):
             result = parsed_files[rom]
-            # data = rom.result()
+            data = rom.result()
             # print('Parsing result: %s' % data)
             try:
                 data = rom.result()
             except Exception as exc:
                 print('%r generated an exception: %s' % (result, exc))
             else:
-                print('Parsing result: %s' % data)
+                print('Parsing result: \n%s' % data)
 
