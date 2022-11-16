@@ -35,17 +35,19 @@ class Rom:
 		if self.crc:
 			return self.crc
 		self.listArchive()
-		if len(self.archiveContent) == 1:
+		if self.isArchive() and len(self.archiveContent) == 1:
 			self.crc = list(self.archiveContent[0].values())[0].zfill(8)
+		elif self.isArchive():
+			self.crc = self.fileCRC()
 		else:
-			self.crc = None
+			self.crc = self.fileCRC()
 		return self.crc
 
 	def fileCRC(self) -> str:
 		buf = open(self.rompathname, 'rb').read()
 		buf = (binascii.crc32(buf) & 0xFFFFFFFF)
 		self.filecrc = "%08X" % buf
-		return self.filecrc
+		return self.filecrc.lower()
 
 	def isArchive(self) -> bool:
 		return self.romext in self.known_archive_extentions
