@@ -23,7 +23,7 @@ def parse_rom(rom_file: str):
     # Archive: make sure there is only one rom inside and buffer it
     # Compute its hashes
     my_rom = Rom(rom_file)
-    print(my_rom)
+    #print(my_rom)
     real_rom = ''
     #if my_rom.archiveContent and len(my_rom.archiveContent) == 1:
     if my_rom.isArchive() and len(my_rom.archiveContent) > 1:
@@ -55,17 +55,21 @@ if __name__ == '__main__':
     print("Sorting file list...")
     files = sorted(files)
     # print(files_list)
+    total_nb_files = len(files)
+    nb_parsed_files = 0
 
     with concurrent.futures.ThreadPoolExecutor(max_workers = args.jobs) as executor:
         parsed_files = {executor.submit(parse_rom, file): file for file in files_list}
         for rom in concurrent.futures.as_completed(parsed_files):
             result = parsed_files[rom]
-            data = rom.result()
-            # print('Parsing result: %s' % data)
+            nb_parsed_files += 1
             try:
                 data = rom.result()
             except Exception as exc:
-                print('%r generated an exception: %s' % (result, exc))
+                print("\r%r generated an exception: %s" % (result, exc))
             else:
-                print('Parsing result: \n%s' % data)
+                #print('Parsing result: \n%s' % data)
+                pass
+            finally:
+                print("\rFiles parsed: %d / %d" % (nb_parsed_files, total_nb_files), end='')
 
