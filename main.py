@@ -1,7 +1,9 @@
 import argparse
 import concurrent.futures
 import os
+import re
 
+import goodset
 from rom import Rom
 from extlibs.pyrominfo.pyrominfo import RomInfo
 from extlibs.pyrominfo.pyrominfo import dreamcast, gameboy, gba, genericdisc, genesis, mastersystem, nes, nintendo64, nintendods, saturn, snes
@@ -16,6 +18,7 @@ parser.add_argument("path", type=str, help="A path to roms")
 parser.add_argument("--system", "-s", help="System name of the roms folder",
     choices=['dreamcast', 'gb', 'gba', 'megadrive', 'mastersystem', 'nes', 'n64', 'nds', 'saturn', 'snes'], required=True)
 parser.add_argument("--jobs", "-j", help="Sets the number of parallel jobs to run", type=int, default=1)
+parser.add_argument("--naming", "-n", help="Specify a rom naming convention", type=int, default=1, choices=['nointro', 'goodset'])
 args = parser.parse_args()
 
 def parse_rom(rom_file: str):
@@ -23,21 +26,42 @@ def parse_rom(rom_file: str):
     # Archive: make sure there is only one rom inside and buffer it
     # Compute its hashes
     my_rom = Rom(rom_file)
+    cleaned_rom_name = clean_name_goodset(my_rom)
     #print(my_rom)
     real_rom = ''
     #if my_rom.archiveContent and len(my_rom.archiveContent) == 1:
     if my_rom.isArchive() and len(my_rom.archiveContent) > 1:
-        ret = {}
+        raise ValueError("Can't determine which rom to extract from archive")
     elif my_rom.isArchive():
         real_rom = list(my_rom.archiveContent[0].keys())[0]
         rom_data = my_rom.extractRom('ram', real_rom)
         ret = RomInfo.parseBuffer(rom_data)
     else:
         ret = RomInfo.parse(rom_file)
+
+    if not ret:
+        raise ValueError('Unknown header')
+
     ret['source'] = rom_file
     ret['rom'] = real_rom if real_rom else os.path.basename(rom_file)
+    ret['cleaned_title'] = cleaned_rom_name
     return ret
 
+def clean_name_goodset(rom_obj: Rom) -> str|None:
+    rom_name = rom_obj.romname
+    # We reverse the results, so the country is the last pattern we would match and replace
+    # Anything before is part of the rom name
+    #for matching_group in reversed(re.findall("\(.*?\)", rom_name)):
+    for matching_group in reversed(re.findall("(\(.*?\)|\[.*?\])", rom_name)):
+        rom_name = rom_name.replace(matching_group, '')
+        if matching_group[1:-1] in goodset.COUNTRY_CODES:
+            #print('Found country: %s' % matching_group[1:-1])
+            break
+    #print('Final rom name: %s' % rom_name)
+    return rom_name.rstrip()
+
+def clean_name_nointro(name: Rom) -> str|None:
+    pass
 
 if __name__ == '__main__':
     #print(RomInfo.parse('extlibs/pyrominfo/tests/data/Akumajou Dracula.fds'))
@@ -57,6 +81,8 @@ if __name__ == '__main__':
     # print(files_list)
     total_nb_files = len(files)
     nb_parsed_files = 0
+    roms_error = dict()
+    roms_ok = list()
 
     with concurrent.futures.ThreadPoolExecutor(max_workers = args.jobs) as executor:
         parsed_files = {executor.submit(parse_rom, file): file for file in files_list}
@@ -67,9 +93,15 @@ if __name__ == '__main__':
                 data = rom.result()
             except Exception as exc:
                 print("\r%r generated an exception: %s" % (result, exc))
+                roms_error[result] = exc
             else:
                 #print('Parsing result: \n%s' % data)
-                pass
+                # should sort roms in a dict indexed with the 'title' or 'foreign_title' if it exists in the result
+                roms_ok.append(data)
             finally:
                 print("\rFiles parsed: %d / %d" % (nb_parsed_files, total_nb_files), end='')
+    print() # bring back a \n
+    print("Roms not parsed: %d/%d" % (len(roms_error), total_nb_files))
 
+    #for rom in roms_ok:
+    #    print("%s - %s / %s" %(rom['cleaned_title'], rom['title'], rom['foreign_title']))
