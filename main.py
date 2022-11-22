@@ -34,7 +34,7 @@ def parse_rom(rom_file: str):
         raise ValueError("Can't determine which rom to extract from archive")
     elif my_rom.isArchive():
         real_rom = list(my_rom.archiveContent[0].keys())[0]
-        rom_data = my_rom.extractRom('ram', real_rom)
+        rom_data = my_rom.extractRom()
         ret = RomInfo.parseBuffer(rom_data)
     else:
         ret = RomInfo.parse(rom_file)
@@ -77,9 +77,9 @@ if __name__ == '__main__':
         for name in files:
             files_list.append(os.path.join(path, name))
     print("Sorting file list...")
-    files = sorted(files)
+    files_list = sorted(files_list)
     # print(files_list)
-    total_nb_files = len(files)
+    total_nb_files = len(files_list)
     nb_parsed_files = 0
     roms_error = dict()
     roms_ok = list()
@@ -103,5 +103,10 @@ if __name__ == '__main__':
     print() # bring back a \n
     print("Roms not parsed: %d/%d" % (len(roms_error), total_nb_files))
 
-    #for rom in roms_ok:
-    #    print("%s - %s / %s" %(rom['cleaned_title'], rom['title'], rom['foreign_title']))
+    for rom in roms_ok:
+        print(rom['cleaned_title'], end='')
+        if 'title' in rom:
+            print(" - %s" % rom['title'], end='')
+        if 'foreign_title' in rom:
+            print(" / %s" % rom['foreign_title'], end='')
+        print()

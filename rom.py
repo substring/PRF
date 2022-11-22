@@ -45,9 +45,8 @@ class Rom:
 
 	def fileCRC(self) -> str:
 		buf = open(self.rompathname, 'rb').read()
-		buf = (binascii.crc32(buf) & 0xFFFFFFFF)
-		self.filecrc = "%08X" % buf
-		return self.filecrc.lower()
+		self.filecrc = self.compute_hash(buf, 'crc')
+		return self.filecrc
 
 	def isArchive(self) -> bool:
 		return self.romext in self.known_archive_extentions
@@ -78,21 +77,21 @@ class Rom:
 		if self.romext == '7z':
 			self.archiveContent = self.listArchiveFrom7z()
 
-	def extractFileFromZip(self, archiveFile: str, destinationPath = '/tmp') -> str:
-		if destinationPath == 'ram':
+	def extractFileFromZip(self, archiveFile: str, destinationPath = '/tmp'):
+		if not destinationPath:
 			return zipfile.ZipFile(self.rompathname).read(archiveFile)
 		with zipfile.ZipFile(self.rompathname) as romzip:
 			outputFile = romzip.extract(archiveFile, destinationPath)
 			return outputFile
 
-	def extractFileFrom7z(self, archiveFile: str, destinationPath = '/tmp') -> str:
-		if destinationPath == 'ram':
+	def extractFileFrom7z(self, archiveFile: str, destinationPath = '/tmp'):
+		if not destinationPath:
 			return py7zr.SevenZipFile(self.rompathname).read([archiveFile])[archiveFile].getvalue()
 		with py7zr.SevenZipFile(self.rompathname, 'r') as romzip:
 			romzip.extract(destinationPath, archiveFile)
 			return "{}/{}".format(destinationPath, archiveFile)
 
-	def extractRom(self, path='/tmp', fileName=None):
+	def extractRom(self, fileName=None, path=''):
 		extractedFileLocation = None
 		if not fileName:
 			fileName = list(self.archiveContent[0].keys())[0]
@@ -102,34 +101,20 @@ class Rom:
 			extractedFileLocation = self.extractFileFrom7z(fileName, path)
 		return extractedFileLocation
 
-	def md5sum(self, filename='', data=''):
-		if filename:
-			return hashlib.md5(open(filename,'rb').read()).hexdigest()
-		if data:
-			return hashlib.md5(data).hexdigest()
-
-	def sha1sum(self, filename='', data=''):
-		if filename:
-			return hashlib.sha1(open(filename,'rb').read()).hexdigest()
-		if data:
-			return hashlib.sha1(data).hexdigest()
-
 	def getMD5orSHA1(self, hashType) -> str | None:
-		rom = ''
 		if hashType not in ['md5', 'sha1']:
 			return None
-		if len(self.archiveContent) != 1:
-			if hashType == 'md5':
-				return self.md5sum(filename=self.rompathname)
-			elif hashType == 'sha1':
-				return self.sha1sum(filename=self.rompathname)
-			os.remove(rom)
-		rom = self.extractRom('ram', list(self.archiveContent[0].keys())[0])
-		if hashType == 'md5':
-			romHash = self.md5sum(data=rom)
-		elif hashType == 'sha1':
-			romHash = self.sha1sum(data=rom)
-		return romHash
+
+		if self.isArchive() and len(self.archiveContent) != 1:
+			file_data = open(self.rompathname,'rb').read()
+		elif self.isArchive() and len(self.archiveContent) == 1:
+			file_data = self.extractRom()
+		elif not self.isArchive():
+			file_data = open(self.rompathname,'rb').read()
+		else:
+			# This case should never happen, but the most obvious reason is an unvalid archive
+			raise Exception('Not a valid file')
+		return self.compute_hash(file_data, hashType)
 
 	def getMD5(self):
 		if not self.md5:
@@ -140,3 +125,12 @@ class Rom:
 		if not self.sha1:
 			self.sha1 = self.getMD5orSHA1('sha1')
 		return self.sha1
+
+	def compute_hash(self, buffer, hash_type:str) -> str:
+		if hash_type == 'crc' or hash_type == 'crc32)':
+			return "%08X".lower() % (binascii.crc32(buffer) & 0xFFFFFFFF)
+		if hash_type == 'md5':
+			return hashlib.md5(buffer).hexdigest()
+		if hash_type == 'sha1':
+			return hashlib.sha1(buffer).hexdigest()
+		return ''
